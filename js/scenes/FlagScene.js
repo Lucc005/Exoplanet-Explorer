@@ -128,3 +128,5 @@ class FlagScene extends Phaser.Scene {
     }
 
 }
+
+window.FlagScene = FlagScene;

@@ -148,3 +148,5 @@ class MenuScene extends Phaser.Scene {
     }
 
 }
+
+window.MenuScene = MenuScene;

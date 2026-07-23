@@ -94,7 +94,7 @@ class PlanetSelectScene extends Phaser.Scene {
             ()=>{
 
                 this.scene.start(
-                    "Planet1Scene",
+                    "PlanetIntroScene",
                     {
                         name:this.playerName,
                         flag:this.flag
@@ -108,3 +108,5 @@ class PlanetSelectScene extends Phaser.Scene {
     }
 
 }
+
+window.PlanetSelectScene = PlanetSelectScene;

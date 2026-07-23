@@ -87,3 +87,5 @@ class PlanetIntroScene extends Phaser.Scene {
 
 
 }
+
+window.PlanetIntroScene = PlanetIntroScene;

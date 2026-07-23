@@ -120,3 +120,5 @@ class NameScene extends Phaser.Scene {
     }
 
 }
+
+window.NameScene = NameScene;

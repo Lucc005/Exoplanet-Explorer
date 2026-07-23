@@ -148,3 +148,5 @@ class StoryScene extends Phaser.Scene {
 
 
 }
+
+window.StoryScene = StoryScene;

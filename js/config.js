@@ -33,7 +33,9 @@ const config = {
         StoryScene,
         PlanetSelectScene,
         PlanetIntroScene,
-        Planet1Scene
+        Planet1Scene,
+        BossScene,
+        VictoryScene
     ]
 
-};
+}
