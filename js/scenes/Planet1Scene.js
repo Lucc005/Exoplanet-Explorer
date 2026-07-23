@@ -11,7 +11,6 @@ class Planet1Scene extends Phaser.Scene {
     create() {
         this.cameras.main.setBackgroundColor("#3a8f3a");
 
-        // Prevent the boss transition from running more than once.
         this.levelComplete = false;
 
         // Terrain
@@ -23,7 +22,7 @@ class Planet1Scene extends Phaser.Scene {
             0x3a8f3a
         );
 
-        // Water area
+        // Water
         this.water = this.add.rectangle(
             80,
             70,
@@ -39,11 +38,15 @@ class Planet1Scene extends Phaser.Scene {
             120
         );
 
-        // Laser group
-        this.bullets = this.physics.add.group();
+        // Laser objects
+        this.lasers = [];
 
-        // Enemy group
-        this.enemies = this.physics.add.group();
+        // Physics groups
+        this.bullets =
+            this.physics.add.group();
+
+        this.enemies =
+            this.physics.add.group();
 
         this.enemiesRemaining = 3;
 
@@ -51,7 +54,6 @@ class Planet1Scene extends Phaser.Scene {
         this.createEnemy(220, 80);
         this.createEnemy(250, 150);
 
-        // Phaser handles laser-enemy collisions here.
         this.physics.add.overlap(
             this.bullets,
             this.enemies,
@@ -99,6 +101,75 @@ class Planet1Scene extends Phaser.Scene {
         this.updateUI();
     }
 
+    update(time, delta) {
+        if (this.levelComplete) {
+            return;
+        }
+
+        this.player.update(delta);
+
+        if (this.player.canShoot()) {
+            this.shoot();
+        }
+
+        this.updateLasers(delta);
+        this.moveEnemies(delta);
+        this.checkEnemyDamage();
+    }
+
+    shoot() {
+        const directionVectors = {
+            left: { x: -1, y: 0 },
+            right: { x: 1, y: 0 },
+            up: { x: 0, y: -1 },
+            down: { x: 0, y: 1 }
+        };
+
+        const direction =
+            directionVectors[this.player.direction];
+
+        const spawnDistance = 12;
+
+        const spawnX =
+            this.player.sprite.x +
+            direction.x * spawnDistance;
+
+        const spawnY =
+            this.player.sprite.y +
+            direction.y * spawnDistance;
+
+        const laser = new Laser(
+            this,
+            spawnX,
+            spawnY,
+            this.player.direction,
+            {
+                speed: 220,
+                damage: 1,
+                color: 0x00ffff
+            }
+        );
+
+        this.lasers.push(laser);
+
+        this.bullets.add(
+            laser.sprite
+        );
+    }
+
+    updateLasers(delta) {
+        for (const laser of this.lasers) {
+            laser.update(delta);
+        }
+
+        this.lasers =
+            this.lasers.filter(
+                laser =>
+                    laser.sprite &&
+                    laser.sprite.active
+            );
+    }
+
     createEnemy(x, y) {
         const enemy = this.add.rectangle(
             x,
@@ -124,132 +195,31 @@ class Planet1Scene extends Phaser.Scene {
         this.enemies.add(enemy);
     }
 
-    update(time, delta) {
-        if (this.levelComplete) {
-            return;
-        }
-
-        this.player.update(delta);
-
-        if (this.player.canShoot()) {
-            this.shoot();
-        }
-
-        this.moveBullets(delta);
-        this.moveEnemies(delta);
-        this.checkEnemyDamage();
-    }
-
-    shoot() {
-        const directionVectors = {
-            left: {
-                x: -1,
-                y: 0
-            },
-
-            right: {
-                x: 1,
-                y: 0
-            },
-
-            up: {
-                x: 0,
-                y: -1
-            },
-
-            down: {
-                x: 0,
-                y: 1
-            }
-        };
-
-        const direction =
-            directionVectors[this.player.direction];
-
-        const spawnDistance = 12;
-
-        const laserWidth =
-            direction.x === 0 ? 3 : 8;
-
-        const laserHeight =
-            direction.y === 0 ? 3 : 8;
-
-        const laser = this.add.rectangle(
-            this.player.sprite.x +
-                direction.x * spawnDistance,
-
-            this.player.sprite.y +
-                direction.y * spawnDistance,
-
-            laserWidth,
-            laserHeight,
-            0x00ffff
-        );
-
-        this.physics.add.existing(laser);
-
-        laser.speed = 220;
-        laser.damage = 1;
-        laser.directionX = direction.x;
-        laser.directionY = direction.y;
-        laser.hasHit = false;
-
-        laser.body.setAllowGravity(false);
-
-        laser.body.setSize(
-            laserWidth,
-            laserHeight
-        );
-
-        this.bullets.add(laser);
-    }
-
-    moveBullets(delta) {
-        const bullets = this.bullets.getChildren();
-
-        for (const bullet of bullets) {
-            if (!bullet || !bullet.active) {
-                continue;
-            }
-
-            bullet.x +=
-                bullet.directionX *
-                bullet.speed *
-                delta / 1000;
-
-            bullet.y +=
-                bullet.directionY *
-                bullet.speed *
-                delta / 1000;
-
-            bullet.body.updateFromGameObject();
-
-            const outsideWorld =
-                bullet.x < -10 ||
-                bullet.x > 330 ||
-                bullet.y < -10 ||
-                bullet.y > 190;
-
-            if (outsideWorld) {
-                bullet.destroy();
-            }
-        }
-    }
-
-    laserHitEnemy(laser, enemy) {
+    laserHitEnemy(
+        laserSprite,
+        enemy
+    ) {
         if (
-            !laser.active ||
+            !laserSprite.active ||
             !enemy.active ||
-            laser.hasHit ||
             enemy.wasDefeated
         ) {
             return;
         }
 
-        laser.hasHit = true;
+        const laser =
+            laserSprite.laserObject;
+
+        if (
+            !laser ||
+            laser.hasHit
+        ) {
+            return;
+        }
+
         enemy.health -= laser.damage;
 
-        laser.destroy();
+        laser.hit();
 
         this.flashEnemy(enemy);
 
@@ -263,13 +233,17 @@ class Planet1Scene extends Phaser.Scene {
             return;
         }
 
-        enemy.setFillStyle(0xffffff);
+        enemy.setFillStyle(
+            0xffffff
+        );
 
         this.time.delayedCall(
             80,
             () => {
                 if (enemy.active) {
-                    enemy.setFillStyle(0xff0000);
+                    enemy.setFillStyle(
+                        0xff0000
+                    );
                 }
             }
         );
@@ -291,13 +265,16 @@ class Planet1Scene extends Phaser.Scene {
 
         this.updateUI();
 
-        if (this.enemiesRemaining <= 0) {
+        if (
+            this.enemiesRemaining <= 0
+        ) {
             this.prepareBossBattle();
         }
     }
 
     moveEnemies(delta) {
-        const enemies = this.enemies.getChildren();
+        const enemies =
+            this.enemies.getChildren();
 
         for (const enemy of enemies) {
             if (
@@ -316,7 +293,10 @@ class Planet1Scene extends Phaser.Scene {
                     this.player.sprite.y
                 );
 
-            if (distance > enemy.detectionRange) {
+            if (
+                distance >
+                enemy.detectionRange
+            ) {
                 continue;
             }
 
@@ -338,12 +318,14 @@ class Planet1Scene extends Phaser.Scene {
                 enemy.speed *
                 delta / 1000;
 
-            enemy.body.updateFromGameObject();
+            enemy.body
+                .updateFromGameObject();
         }
     }
 
     checkEnemyDamage() {
-        const enemies = this.enemies.getChildren();
+        const enemies =
+            this.enemies.getChildren();
 
         for (const enemy of enemies) {
             if (
@@ -355,10 +337,13 @@ class Planet1Scene extends Phaser.Scene {
             }
 
             const touching =
-                Phaser.Geom.Intersects.RectangleToRectangle(
-                    this.player.sprite.getBounds(),
-                    enemy.getBounds()
-                );
+                Phaser.Geom.Intersects
+                    .RectangleToRectangle(
+                        this.player.sprite
+                            .getBounds(),
+
+                        enemy.getBounds()
+                    );
 
             if (!touching) {
                 continue;
@@ -392,10 +377,14 @@ class Planet1Scene extends Phaser.Scene {
                 enemy.y
             );
 
-        enemy.x += Math.cos(angle) * 18;
-        enemy.y += Math.sin(angle) * 18;
+        enemy.x +=
+            Math.cos(angle) * 18;
 
-        enemy.body.updateFromGameObject();
+        enemy.y +=
+            Math.sin(angle) * 18;
+
+        enemy.body
+            .updateFromGameObject();
     }
 
     prepareBossBattle() {
@@ -405,10 +394,12 @@ class Planet1Scene extends Phaser.Scene {
 
         this.levelComplete = true;
 
-        this.player.sprite.setVisible(false);
+        this.player.sprite
+            .setVisible(false);
 
         this.messageText.setText(
-            "ALL ALIENS DEFEATED!\nBOSS DETECTED..."
+            "ALL ALIENS DEFEATED!\n" +
+            "BOSS DETECTED..."
         );
 
         this.cameras.main.flash(
@@ -424,9 +415,14 @@ class Planet1Scene extends Phaser.Scene {
                 this.scene.start(
                     "BossScene",
                     {
-                        name: this.playerName,
-                        flag: this.flag,
-                        health: this.player.health
+                        name:
+                            this.playerName,
+
+                        flag:
+                            this.flag,
+
+                        health:
+                            this.player.health
                     }
                 );
             }
@@ -447,8 +443,11 @@ class Planet1Scene extends Phaser.Scene {
             250,
             () => {
                 this.scene.restart({
-                    name: this.playerName,
-                    flag: this.flag
+                    name:
+                        this.playerName,
+
+                    flag:
+                        this.flag
                 });
             }
         );
@@ -456,14 +455,17 @@ class Planet1Scene extends Phaser.Scene {
 
     updateUI() {
         this.healthText.setText(
-            `HP: ${this.player.health}/${this.player.maxHealth}` +
+            `HP: ${this.player.health}/` +
+            `${this.player.maxHealth}` +
             "\nLASER MK I"
         );
 
         this.enemyText.setText(
-            `ALIENS: ${this.enemiesRemaining}`
+            `ALIENS: ` +
+            `${this.enemiesRemaining}`
         );
     }
 }
 
-window.Planet1Scene = Planet1Scene;
+window.Planet1Scene =
+    Planet1Scene;
